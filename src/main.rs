@@ -250,6 +250,7 @@ impl App {
             RawWindowHandle::AppKit(handle) => {
                 use ash::ext::metal_surface;
 
+                #[cfg(target_os = "macos")]
                 autoreleasepool(|| {
                     let ns_view = handle.ns_view.as_ptr() as *mut Object;
                     println!("NSView pointer: {:p}", ns_view);
