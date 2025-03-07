@@ -1,15 +1,21 @@
 [package]
-name = "vulkan_vibe_coding"           # The name of your project
-version = "0.1.0"             # The version of your project
-edition = "2021"              # The Rust edition (2021 rules for syntax/features)
+name = "vulkan_vibe_coding"
+version = "0.1.0"
+edition = "2021"
 
-[dependencies]                # Libraries your project needs to run
-winit = "0.30.9"              # For creating and managing windows
-ico = "0.4"                   # For handling .ico (icon) files
-ash = "0.38"                  # For interacting with Vulkan (the graphics API)
-icns = "0.3.1"  # For macOS ICNS parsing at runtime
-glam = "0.30"
-bytemuck = "1.22.0"  # For vector math
+[dependencies]
+winit = "0.30.9"
+ash = "0.38"
+ico = "0.4.0"
+icns = "0.3.1"
+glam = "0.30.0"
+bytemuck = "1.16.1"
 
-[build-dependencies]          # Libraries needed only during the build process
-winresource = "0.1.19"        # For embedding Windows-specific resources (like icons) into the binary
+[dependencies.objc]
+version = "0.2.7"
+features = []
+[target.'cfg(target_os = "macos")'.dependencies.objc]
+version = "0.2.7"
+
+[build-dependencies]
+winresource = "0.1.19"
