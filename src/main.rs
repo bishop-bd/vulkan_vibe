@@ -1,6 +1,3 @@
-#[cfg(target_os = "macos")]
-#[macro_use]
-extern crate objc;
 use ash::vk;
 use bytemuck;
 use glam::{Mat4, Vec2};
@@ -216,10 +213,7 @@ impl App {
         println!("Creating Vulkan surface");
         let window = self.window.as_ref().unwrap();
         println!("Got window reference");
-        let raw_window_handle = window
-            .window_handle()
-            .expect("Failed to get window handle")
-            .as_raw();
+        let raw_window_handle = window.window_handle().expect("Failed to get window handle").as_raw();
         println!("Got raw window handle");
         match raw_window_handle {
             #[cfg(target_os = "windows")]
@@ -229,13 +223,8 @@ impl App {
                     hwnd: handle.hwnd.get(),
                     ..Default::default()
                 };
-                let win32_surface_instance = ash::khr::win32_surface::Instance::new(
-                    &self.entry,
-                    self.instance.as_ref().unwrap(),
-                );
-                match unsafe {
-                    win32_surface_instance.create_win32_surface(&surface_create_info, None)
-                } {
+                let win32_surface_instance = ash::khr::win32_surface::Instance::new(&self.entry, self.instance.as_ref().unwrap());
+                match unsafe { win32_surface_instance.create_win32_surface(&surface_create_info, None) } {
                     Ok(surface) => {
                         self.surface = surface;
                         println!("Vulkan surface created successfully (Windows)");
@@ -248,15 +237,17 @@ impl App {
             }
             #[cfg(target_os = "macos")]
             RawWindowHandle::AppKit(handle) => {
+                #[cfg(target_os = "macos")]
                 use ash::ext::metal_surface;
 
+                #[cfg(target_os = "macos")]
+                #[allow(unexpected_cfgs)]
                 autoreleasepool(|| {
                     let ns_view = handle.ns_view.as_ptr() as *mut Object;
                     println!("NSView pointer: {:p}", ns_view);
 
                     // Create a CAMetalLayer
-                    let metal_layer: *mut Object =
-                        unsafe { msg_send![class!(CAMetalLayer), layer] };
+                    let metal_layer: *mut Object = unsafe { msg_send![class!(CAMetalLayer), layer] };
                     println!("Created CAMetalLayer: {:p}", metal_layer);
 
                     // Set the layer on the NSView
@@ -275,13 +266,10 @@ impl App {
                         _marker: std::marker::PhantomData,
                     };
                     println!("Building surface create info");
-                    let metal_surface_instance =
-                        metal_surface::Instance::new(&self.entry, self.instance.as_ref().unwrap());
+                    let metal_surface_instance = metal_surface::Instance::new(&self.entry, self.instance.as_ref().unwrap());
                     println!("Creating metal surface instance");
                     println!("Attempting to create metal surface");
-                    match unsafe {
-                        metal_surface_instance.create_metal_surface(&surface_create_info, None)
-                    } {
+                    match unsafe { metal_surface_instance.create_metal_surface(&surface_create_info, None) } {
                         Ok(surface) => {
                             self.surface = surface;
                             println!("Vulkan surface created successfully (macOS)");
