@@ -5,13 +5,17 @@ edition = "2021"
 
 [dependencies]
 winit = "0.30.9"
-ico = "0.4"
-ash = "0.38"  # No features needed for VK_KHR_metal_surface
+ash = "0.38"
+ico = "0.4.0"
 icns = "0.3.1"
-glam = "0.30"
-bytemuck = "1.22.0"
-objc = "0.2.7"
-metal = "0.29.0"  # For CAMetalLayer type
+glam = "0.30.0"
+bytemuck = "1.16.1"
+
+[dependencies.objc]
+version = "0.2.7"
+features = []
+[target.'cfg(target_os = "macos")'.dependencies.objc]
+version = "0.2.7"
 
 [build-dependencies]
 winresource = "0.1.19"

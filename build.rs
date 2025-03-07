@@ -13,7 +13,9 @@ fn main() {
         "unix" => {
             if env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() == "macos" {
                 if !std::path::Path::new("assets/icon.icns").exists() {
-                    println!("cargo:warning=assets/icon.icns not found for macOS; ensure it’s provided.");
+                    println!(
+                        "cargo:warning=assets/icon.icns not found for macOS; ensure it’s provided."
+                    );
                 }
             }
         }
