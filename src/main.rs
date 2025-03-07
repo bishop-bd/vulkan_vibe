@@ -237,6 +237,7 @@ impl App {
             }
             #[cfg(target_os = "macos")]
             RawWindowHandle::AppKit(handle) => {
+                #[cfg(target_os = "macos")]
                 use ash::ext::metal_surface;
 
                 #[cfg(target_os = "macos")]
