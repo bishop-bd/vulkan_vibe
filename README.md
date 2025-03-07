@@ -9,6 +9,7 @@ This Rust program:
 - Uses the `winit` library to create a cross-platform window
 - Uses the `ash` crate to interface with Vulkan for rendering
 - Sets platform-specific window icons (.ico for Windows, .icns for macOS)
+- Creates platform-specific surfaces for Vulkan rendering on Windows and macOS
 - Renders a moving circle that bounces off window edges
 - Handles window resizing and proper Vulkan resource management
 
@@ -22,6 +23,12 @@ ash = "0.38"                  # For interacting with Vulkan (the graphics API)
 icns = "0.3"                  # For macOS ICNS parsing at runtime
 glam = "0.27"                 # For vector math and linear algebra
 bytemuck = "1.22.0"           # For casting between Rust types and byte slices
+
+[dependencies.objc]           # macOS-specific dependency
+version = "0.2.7"
+features = []
+[target.'cfg(target_os = "macos")'.dependencies.objc]
+version = "0.2.7"
 
 [build-dependencies]          # Libraries needed only during the build process
 winresource = "0.1.19"        # For embedding Windows-specific resources (like icons) into the binary
@@ -76,11 +83,10 @@ The circle is approximated as a triangle fan with 32 segments, with vertex posit
 4. Sets up swapchain, image views, and render pass
 5. Initializes command buffers and synchronization objects
 6. Creates vertex buffer and graphics pipeline
-7. Renders with orthographic projection
 
 ### Cross-Platform Compatibility
 - Windows-specific surface creation and icon embedding
-- macOS-specific icon loading at runtime
+- macOS-specific surface creation and icon embedding
 - Consistent rendering across platforms
 
 ## Purpose
