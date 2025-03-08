@@ -102,7 +102,7 @@ impl ApplicationHandler for App {
             const ICNS_DATA: &[u8] = include_bytes!("../assets/icon.icns");
             let mut cursor = Cursor::new(ICNS_DATA);
             let icon_family = IconFamily::read(&mut cursor).expect("Failed to read icon.icns");
-            match icon_family.get_icon_with_type(icns::IconType::RGBA32_16x16) {
+            match icon_family.get_icon_with_type(icns::IconType::RGBA32_512x512) {
                 Ok(image) => {
                     let rgba = image.data().to_vec();
                     let width = image.width();
