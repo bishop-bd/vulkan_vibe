@@ -1,14 +1,6 @@
 use ash::vk;
 use bytemuck;
 use glam::{Mat4, Vec2};
-#[allow(unused_imports)]
-use ico::IconDir;
-#[cfg(target_os = "macos")]
-use objc::rc::autoreleasepool;
-#[cfg(target_os = "macos")]
-use objc::runtime::{Object, YES};
-#[cfg(target_os = "macos")]
-use objc::{class, msg_send, sel, sel_impl};
 use std::io::Cursor;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
@@ -16,9 +8,15 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use winit::window::{Icon, Window, WindowId};
-
-#[allow(dead_code)]
-const ICON_DATA: &[u8] = include_bytes!("../assets/icon.ico");
+#[cfg(target_os = "macos")]
+use objc::{
+    rc::autoreleasepool,
+    runtime::{Object, YES},
+    class,
+    msg_send,
+    sel,
+    sel_impl,
+};
 
 #[repr(C)]
 struct Vertex {
@@ -61,9 +59,9 @@ struct App {
     pipeline_layout: vk::PipelineLayout,
     vertex_buffer: vk::Buffer,
     vertex_buffer_memory: vk::DeviceMemory,
-    extent: vk::Extent2D,  // Uncommented
-    circle_position: Vec2, // Uncommented
-    circle_velocity: Vec2, // Uncommented
+    extent: vk::Extent2D,
+    circle_position: Vec2,
+    circle_velocity: Vec2,
 }
 
 impl ApplicationHandler for App {
@@ -80,6 +78,9 @@ impl ApplicationHandler for App {
 
         #[cfg(target_os = "windows")]
         {
+            use ico::IconDir;
+            const ICON_DATA: &[u8] = include_bytes!("../assets/icon.ico");
+
             let mut cursor = Cursor::new(ICON_DATA);
             let ico = IconDir::read(&mut cursor).expect("Failed to read icon data");
             let entry = ico
@@ -100,6 +101,7 @@ impl ApplicationHandler for App {
         {
             use icns::IconFamily;
             const ICNS_DATA: &[u8] = include_bytes!("../assets/icon.icns");
+
             let mut cursor = Cursor::new(ICNS_DATA);
             let icon_family = IconFamily::read(&mut cursor).expect("Failed to read icon.icns");
             match icon_family.get_icon_with_type(icns::IconType::RGBA32_512x512) {
@@ -1146,9 +1148,9 @@ fn main() {
         extent: vk::Extent2D {
             width: 0,
             height: 0,
-        }, // Initialized
-        circle_position: Vec2::ZERO, // Initialized
-        circle_velocity: Vec2::ZERO, // Initialized
+        },
+        circle_position: Vec2::ZERO,
+        circle_velocity: Vec2::ZERO,
     };
     println!("App initialized with Vulkan entry");
 
