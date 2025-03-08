@@ -85,7 +85,7 @@ impl ApplicationHandler for App {
             let entry = ico
                 .entries()
                 .iter()
-                .find(|e| e.width() == 16 && e.height() == 16)
+                .find(|e| e.width() == 64 && e.height() == 64)
                 .expect("No 16x16 icon found in assets/icon.ico");
             let icon_image = entry.decode().expect("Failed to decode icon image");
             let rgba = icon_image.rgba_data().to_vec();
