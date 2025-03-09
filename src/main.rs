@@ -1,24 +1,23 @@
 use ash::vk;
 use bytemuck;
 use glam::{Mat4, Vec2};
-#[allow(unused_imports)]
-use ico::IconDir;
-#[cfg(target_os = "macos")]
-use objc::rc::autoreleasepool;
-#[cfg(target_os = "macos")]
-use objc::runtime::{Object, YES};
-#[cfg(target_os = "macos")]
-use objc::{class, msg_send, sel, sel_impl};
-use std::io::Cursor;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::window::{Window, WindowId};
 use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use winit::window::{Icon, Window, WindowId};
-
-#[allow(dead_code)]
-const ICON_DATA: &[u8] = include_bytes!("../assets/icon.ico");
+#[cfg(target_os = "linux")]
+use winit::raw_window_handle::{HasDisplayHandle, RawDisplayHandle};
+#[cfg(target_os = "macos")]
+use objc::{
+    rc::autoreleasepool,
+    runtime::{Object, YES},
+    class,
+    msg_send,
+    sel,
+    sel_impl,
+};
 
 #[repr(C)]
 struct Vertex {
@@ -61,9 +60,9 @@ struct App {
     pipeline_layout: vk::PipelineLayout,
     vertex_buffer: vk::Buffer,
     vertex_buffer_memory: vk::DeviceMemory,
-    extent: vk::Extent2D,  // Uncommented
-    circle_position: Vec2, // Uncommented
-    circle_velocity: Vec2, // Uncommented
+    extent: vk::Extent2D,
+    circle_position: Vec2,
+    circle_velocity: Vec2,
 }
 
 impl ApplicationHandler for App {
@@ -80,12 +79,17 @@ impl ApplicationHandler for App {
 
         #[cfg(target_os = "windows")]
         {
+            use std::io::Cursor;
+            use winit::window::Icon;
+            use ico::IconDir;
+            const ICON_DATA: &[u8] = include_bytes!("../assets/icon.ico");
+
             let mut cursor = Cursor::new(ICON_DATA);
             let ico = IconDir::read(&mut cursor).expect("Failed to read icon data");
             let entry = ico
                 .entries()
                 .iter()
-                .find(|e| e.width() == 16 && e.height() == 16)
+                .find(|e| e.width() == 64 && e.height() == 64)
                 .expect("No 16x16 icon found in assets/icon.ico");
             let icon_image = entry.decode().expect("Failed to decode icon image");
             let rgba = icon_image.rgba_data().to_vec();
@@ -98,11 +102,14 @@ impl ApplicationHandler for App {
         }
         #[cfg(target_os = "macos")]
         {
+            use std::io::Cursor;
             use icns::IconFamily;
+            use winit::window::Icon;
             const ICNS_DATA: &[u8] = include_bytes!("../assets/icon.icns");
+
             let mut cursor = Cursor::new(ICNS_DATA);
             let icon_family = IconFamily::read(&mut cursor).expect("Failed to read icon.icns");
-            match icon_family.get_icon_with_type(icns::IconType::RGBA32_16x16) {
+            match icon_family.get_icon_with_type(icns::IconType::RGBA32_512x512) {
                 Ok(image) => {
                     let rgba = image.data().to_vec();
                     let width = image.width();
@@ -179,6 +186,11 @@ impl App {
         instance_extension_names.push(CString::new("VK_KHR_win32_surface").unwrap());
         #[cfg(target_os = "macos")]
         instance_extension_names.push(CString::new("VK_EXT_metal_surface").unwrap());
+        #[cfg(target_os = "linux")]
+        {
+            instance_extension_names.push(CString::new("VK_KHR_xlib_surface").unwrap());
+            instance_extension_names.push(CString::new("VK_KHR_wayland_surface").unwrap());
+        }
 
         let instance_extension_names_ptrs: Vec<*const std::os::raw::c_char> =
             instance_extension_names
@@ -281,7 +293,42 @@ impl App {
                     }
                 });
             }
-            _ => panic!("Unsupported platform; this example assumes Windows or macOS"),
+            #[cfg(target_os = "linux")]
+            RawWindowHandle::Xlib(handle) => {
+                let display_handle = self.window.as_ref().unwrap().display_handle().expect("Failed to get display handle");
+                let xlib_display_handle = match display_handle.as_raw() {
+                    RawDisplayHandle::Xlib(xlib) => xlib,
+                    _ => panic!("Expected Xlib display handle for X11 window"),
+                };
+                let display = xlib_display_handle.display.unwrap().as_ptr();
+                let surface_create_info = vk::XlibSurfaceCreateInfoKHR {
+                    dpy: display,
+                    window: handle.window,
+                    ..Default::default()
+                };
+                let xlib_surface_instance = ash::khr::xlib_surface::Instance::new(&self.entry, self.instance.as_ref().unwrap());
+                self.surface = unsafe { xlib_surface_instance.create_xlib_surface(&surface_create_info, None).expect("Failed to create Xlib surface") };
+                println!("Vulkan surface created successfully (Linux X11)");
+            }
+            #[cfg(target_os = "linux")]
+            RawWindowHandle::Wayland(handle) => {
+                let display_handle = self.window.as_ref().unwrap().display_handle().expect("Failed to get display handle");
+                let wayland_display_handle = match display_handle.as_raw() {
+                    RawDisplayHandle::Wayland(wayland) => wayland,
+                    _ => panic!("Expected Wayland display handle for Wayland window"),
+                };
+                let display = wayland_display_handle.display.as_ptr();
+                let surface = handle.surface.as_ptr(); // Get surface from RawWindowHandle::Wayland
+                let surface_create_info = vk::WaylandSurfaceCreateInfoKHR {
+                    display,
+                    surface,
+                    ..Default::default()
+                };
+                let wayland_surface_instance = ash::khr::wayland_surface::Instance::new(&self.entry, self.instance.as_ref().unwrap());
+                self.surface = unsafe { wayland_surface_instance.create_wayland_surface(&surface_create_info, None).expect("Failed to create Wayland surface") };
+                println!("Vulkan surface created successfully (Linux Wayland)");
+            }
+            _ => panic!("Unsupported platform."),
         }
 
         // Physical device enumeration
@@ -1146,9 +1193,9 @@ fn main() {
         extent: vk::Extent2D {
             width: 0,
             height: 0,
-        }, // Initialized
-        circle_position: Vec2::ZERO, // Initialized
-        circle_velocity: Vec2::ZERO, // Initialized
+        },
+        circle_position: Vec2::ZERO,
+        circle_velocity: Vec2::ZERO,
     };
     println!("App initialized with Vulkan entry");
 
