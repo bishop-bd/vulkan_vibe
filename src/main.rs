@@ -5,9 +5,10 @@ use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
-use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle};
 use winit::window::{Window, WindowId};
-
+use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
+#[cfg(target_os = "linux")]
+use winit::raw_window_handle::{HasDisplayHandle, RawDisplayHandle};
 #[cfg(target_os = "macos")]
 use objc::{
     rc::autoreleasepool,
