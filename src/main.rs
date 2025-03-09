@@ -1,13 +1,13 @@
 use ash::vk;
 use bytemuck;
 use glam::{Mat4, Vec2};
-use std::io::Cursor;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle};
-use winit::window::{Icon, Window, WindowId};
+use winit::window::{Window, WindowId};
+
 #[cfg(target_os = "macos")]
 use objc::{
     rc::autoreleasepool,
@@ -78,6 +78,8 @@ impl ApplicationHandler for App {
 
         #[cfg(target_os = "windows")]
         {
+            use std::io::Cursor;
+            use winit::window::Icon;
             use ico::IconDir;
             const ICON_DATA: &[u8] = include_bytes!("../assets/icon.ico");
 
@@ -100,6 +102,7 @@ impl ApplicationHandler for App {
         #[cfg(target_os = "macos")]
         {
             use icns::IconFamily;
+            use winit::window::Icon;
             const ICNS_DATA: &[u8] = include_bytes!("../assets/icon.icns");
 
             let mut cursor = Cursor::new(ICNS_DATA);
