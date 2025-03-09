@@ -102,6 +102,7 @@ impl ApplicationHandler for App {
         }
         #[cfg(target_os = "macos")]
         {
+            use std::io::Cursor;
             use icns::IconFamily;
             use winit::window::Icon;
             const ICNS_DATA: &[u8] = include_bytes!("../assets/icon.icns");
