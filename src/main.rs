@@ -6,7 +6,7 @@ use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
-use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
+use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle};
 use winit::window::{Icon, Window, WindowId};
 #[cfg(target_os = "macos")]
 use objc::{
@@ -181,6 +181,11 @@ impl App {
         instance_extension_names.push(CString::new("VK_KHR_win32_surface").unwrap());
         #[cfg(target_os = "macos")]
         instance_extension_names.push(CString::new("VK_EXT_metal_surface").unwrap());
+        #[cfg(target_os = "linux")]
+        {
+            instance_extension_names.push(CString::new("VK_KHR_xlib_surface").unwrap());
+            instance_extension_names.push(CString::new("VK_KHR_wayland_surface").unwrap());
+        }
 
         let instance_extension_names_ptrs: Vec<*const std::os::raw::c_char> =
             instance_extension_names
@@ -283,7 +288,42 @@ impl App {
                     }
                 });
             }
-            _ => panic!("Unsupported platform; this example assumes Windows or macOS"),
+            #[cfg(target_os = "linux")]
+            RawWindowHandle::Xlib(handle) => {
+                let display_handle = self.window.as_ref().unwrap().display_handle().expect("Failed to get display handle");
+                let xlib_display_handle = match display_handle.as_raw() {
+                    RawDisplayHandle::Xlib(xlib) => xlib,
+                    _ => panic!("Expected Xlib display handle for X11 window"),
+                };
+                let display = xlib_display_handle.display.unwrap().as_ptr();
+                let surface_create_info = vk::XlibSurfaceCreateInfoKHR {
+                    dpy: display,
+                    window: handle.window,
+                    ..Default::default()
+                };
+                let xlib_surface_instance = ash::khr::xlib_surface::Instance::new(&self.entry, self.instance.as_ref().unwrap());
+                self.surface = unsafe { xlib_surface_instance.create_xlib_surface(&surface_create_info, None).expect("Failed to create Xlib surface") };
+                println!("Vulkan surface created successfully (Linux X11)");
+            }
+            #[cfg(target_os = "linux")]
+            RawWindowHandle::Wayland(handle) => {
+                let display_handle = self.window.as_ref().unwrap().display_handle().expect("Failed to get display handle");
+                let wayland_display_handle = match display_handle.as_raw() {
+                    RawDisplayHandle::Wayland(wayland) => wayland,
+                    _ => panic!("Expected Wayland display handle for Wayland window"),
+                };
+                let display = wayland_display_handle.display.as_ptr();
+                let surface = handle.surface.as_ptr(); // Get surface from RawWindowHandle::Wayland
+                let surface_create_info = vk::WaylandSurfaceCreateInfoKHR {
+                    display,
+                    surface,
+                    ..Default::default()
+                };
+                let wayland_surface_instance = ash::khr::wayland_surface::Instance::new(&self.entry, self.instance.as_ref().unwrap());
+                self.surface = unsafe { wayland_surface_instance.create_wayland_surface(&surface_create_info, None).expect("Failed to create Wayland surface") };
+                println!("Vulkan surface created successfully (Linux Wayland)");
+            }
+            _ => panic!("Unsupported platform."),
         }
 
         // Physical device enumeration
