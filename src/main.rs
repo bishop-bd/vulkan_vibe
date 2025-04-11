@@ -12,7 +12,7 @@ use winit::raw_window_handle::{HasDisplayHandle, RawDisplayHandle};
 #[cfg(target_os = "macos")]
 use objc::{
     rc::autoreleasepool,
-    runtime::{Object, YES},
+    runtime::{Object, YES, NO},
     class,
     msg_send,
     sel,
@@ -636,7 +636,7 @@ impl App {
     }
 
     fn create_vertex_buffer(&mut self, vertices: &[Vertex]) {
-        let buffer_size = std::mem::size_of_val(vertices) as vk::DeviceSize;
+        let buffer_size = size_of_val(vertices) as vk::DeviceSize;
         let buffer_create_info = vk::BufferCreateInfo {
             size: buffer_size,
             usage: vk::BufferUsageFlags::VERTEX_BUFFER,
@@ -716,7 +716,7 @@ impl App {
             vertex_binding_description_count: 1,
             p_vertex_binding_descriptions: &vk::VertexInputBindingDescription {
                 binding: 0,
-                stride: std::mem::size_of::<Vertex>() as u32,
+                stride: size_of::<Vertex>() as u32,
                 input_rate: vk::VertexInputRate::VERTEX,
             },
             vertex_attribute_description_count: 1,
