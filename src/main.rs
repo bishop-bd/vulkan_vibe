@@ -63,6 +63,9 @@ struct App {
     extent: vk::Extent2D,
     circle_position: Vec2,
     circle_velocity: Vec2,
+    last_title_update: std::time::Instant,
+    frame_count: u32,
+    fps: f32,
 }
 
 impl ApplicationHandler for App {
@@ -410,7 +413,10 @@ impl App {
         println!("Present modes: {:?}", present_modes);
 
         let format = surface_formats[0];
-        let present_mode = present_modes[0];
+        let present_mode = present_modes
+            .into_iter()
+            .find(|&mode| mode == vk::PresentModeKHR::MAILBOX)
+            .unwrap_or(vk::PresentModeKHR::FIFO);
         let extent = if surface_capabilities.current_extent.width == u32::MAX {
             let window_size = window.inner_size();
             vk::Extent2D {
@@ -853,7 +859,13 @@ impl App {
     }
 
     fn update_circle_position(&mut self) {
-        let dt = 1.0 / 60.0; // Assuming 60 FPS
+        static mut LAST_TIME: Option<std::time::Instant> = None;
+        let now = std::time::Instant::now();
+        let dt = unsafe {
+            LAST_TIME.map(|last| now.duration_since(last).as_secs_f32()).unwrap_or(1.0 / 60.0)
+        };
+        unsafe { LAST_TIME = Some(now); }
+
         self.circle_position += self.circle_velocity * dt;
 
         let radius = 50.0;
@@ -868,6 +880,16 @@ impl App {
     }
 
     fn render(&mut self) {
+        // Reset command buffer to prevent state corruption
+        unsafe {
+            self.device
+                .as_ref()
+                .unwrap()
+                .reset_command_buffer(self.command_buffer, vk::CommandBufferResetFlags::empty())
+                .expect("Failed to reset command buffer");
+        }
+
+        // Acquire the next swapchain image
         let result = unsafe {
             self.swapchain_ext.as_ref().unwrap().acquire_next_image(
                 self.swapchain,
@@ -886,6 +908,7 @@ impl App {
             Err(e) => panic!("Failed to acquire next image: {:?}", e),
         };
 
+        // Begin command buffer recording
         unsafe {
             self.device
                 .as_ref()
@@ -893,6 +916,7 @@ impl App {
                 .begin_command_buffer(self.command_buffer, &vk::CommandBufferBeginInfo::default())
                 .expect("Failed to begin command buffer");
 
+            // Start render pass with clear color (black)
             let clear_value = vk::ClearValue {
                 color: vk::ClearColorValue {
                     float32: [0.0, 0.0, 0.0, 1.0],
@@ -916,12 +940,14 @@ impl App {
                 vk::SubpassContents::INLINE,
             );
 
+            // Bind graphics pipeline
             self.device.as_ref().unwrap().cmd_bind_pipeline(
                 self.command_buffer,
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline,
             );
 
+            // Set viewport and scissor
             let viewport = vk::Viewport {
                 x: 0.0,
                 y: 0.0,
@@ -944,6 +970,7 @@ impl App {
                 .unwrap()
                 .cmd_set_scissor(self.command_buffer, 0, &[scissor]);
 
+            // Bind vertex buffer
             self.device.as_ref().unwrap().cmd_bind_vertex_buffers(
                 self.command_buffer,
                 0,
@@ -951,6 +978,7 @@ impl App {
                 &[0],
             );
 
+            // Set up transformation matrix for circle position
             let ortho = Mat4::orthographic_rh(
                 0.0,
                 self.extent.width as f32,
@@ -961,23 +989,25 @@ impl App {
             );
             let transform = Mat4::from_translation(self.circle_position.extend(0.0));
             let mvp = ortho * transform;
-            let mvp_array = mvp.to_cols_array(); // Converts Mat4 to [f32; 16]
+            let mvp_array = mvp.to_cols_array();
             self.device.as_ref().unwrap().cmd_push_constants(
                 self.command_buffer,
                 self.pipeline_layout,
                 vk::ShaderStageFlags::VERTEX,
                 0,
-                bytemuck::cast_slice(&mvp_array), // Safely cast the array to bytes
+                bytemuck::cast_slice(&mvp_array),
             );
 
+            // Draw the circle (triangle fan, 32 segments + center + closing vertex)
             self.device.as_ref().unwrap().cmd_draw(
                 self.command_buffer,
-                34, // 32 segments + center + closing vertex
+                34,
                 1,
                 0,
                 0,
             );
 
+            // End render pass and command buffer
             self.device
                 .as_ref()
                 .unwrap()
@@ -988,6 +1018,7 @@ impl App {
                 .end_command_buffer(self.command_buffer)
                 .expect("Failed to end command buffer");
 
+            // Submit commands to the queue
             let wait_semaphores = [self.image_available_semaphore];
             let signal_semaphores = [self.render_finished_semaphore];
             let submit_info = vk::SubmitInfo {
@@ -1006,6 +1037,7 @@ impl App {
                 .queue_submit(self.queue, &[submit_info], vk::Fence::null())
                 .expect("Failed to submit queue");
 
+            // Present the rendered image
             let present_info = vk::PresentInfoKHR {
                 wait_semaphore_count: 1,
                 p_wait_semaphores: &self.render_finished_semaphore,
@@ -1030,7 +1062,21 @@ impl App {
             }
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(16));
+        // Calculate FPS and update window title every second
+        self.frame_count += 1;
+        let now = std::time::Instant::now();
+        let elapsed = now.duration_since(self.last_title_update).as_secs_f32();
+        if elapsed >= 1.0 {
+            self.fps = self.frame_count as f32 / elapsed;
+            self.window
+                .as_ref()
+                .unwrap()
+                .set_title(&format!("Vulkan Vibe - FPS: {:.1}", self.fps));
+            self.last_title_update = now;
+            self.frame_count = 0;
+        }
+
+        // Request the next frame
         self.window.as_ref().unwrap().request_redraw();
     }
 
@@ -1079,7 +1125,10 @@ impl App {
                 .expect("Failed to get present modes");
 
             let format = surface_formats[0];
-            let present_mode = present_modes[0];
+            let present_mode = present_modes
+                .into_iter()
+                .find(|&mode| mode == vk::PresentModeKHR::MAILBOX)
+                .unwrap_or(vk::PresentModeKHR::FIFO);
             let image_count = surface_capabilities.min_image_count + 1;
             let image_count = if surface_capabilities.max_image_count > 0 {
                 image_count.min(surface_capabilities.max_image_count)
@@ -1196,6 +1245,9 @@ fn main() {
         },
         circle_position: Vec2::ZERO,
         circle_velocity: Vec2::ZERO,
+        last_title_update: std::time::Instant::now(),
+        frame_count: 0,
+        fps: 0.0,
     };
     println!("App initialized with Vulkan entry");
 
