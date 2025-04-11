@@ -269,6 +269,7 @@ impl App {
                     unsafe {
                         let () = msg_send![ns_view, setLayer: metal_layer];
                         let () = msg_send![ns_view, setWantsLayer: YES];
+                        let () = msg_send![metal_layer, setDisplaySyncEnabled: NO];
                     }
                     println!("Set CAMetalLayer on NSView");
 
@@ -416,7 +417,7 @@ impl App {
         let present_mode = present_modes
             .into_iter()
             .find(|&mode| mode == vk::PresentModeKHR::MAILBOX)
-            .unwrap_or(vk::PresentModeKHR::FIFO);
+            .unwrap_or(vk::PresentModeKHR::IMMEDIATE);
         let extent = if surface_capabilities.current_extent.width == u32::MAX {
             let window_size = window.inner_size();
             vk::Extent2D {
@@ -1128,7 +1129,7 @@ impl App {
             let present_mode = present_modes
                 .into_iter()
                 .find(|&mode| mode == vk::PresentModeKHR::MAILBOX)
-                .unwrap_or(vk::PresentModeKHR::FIFO);
+                .unwrap_or(vk::PresentModeKHR::IMMEDIATE);
             let image_count = surface_capabilities.min_image_count + 1;
             let image_count = if surface_capabilities.max_image_count > 0 {
                 image_count.min(surface_capabilities.max_image_count)
